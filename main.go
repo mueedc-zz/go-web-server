@@ -53,3 +53,4 @@ func query(city string) (weatherData, error) {
 
 	return d, nil
 }
+
