@@ -125,8 +125,7 @@ func (w  multiWeatherProvider) temperature (city string) {
 			return 0, err
 		}
 	}
-	
+
 	// return the average temperature
 	return sum / float64(len(providers)), nil
 }
-
