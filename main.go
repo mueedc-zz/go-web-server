@@ -98,39 +98,35 @@ func (w weatherUnderground) temperature (city string) (float64, error) {
 type multiWeatherProvider []weatherProvider
 
 func (w  multiWeatherProvider) temperature (city string) {
+	// individual channels for temperatures and errors. each will push a value into only one
+	temps := make(chan float64, len(w))
+	errs := make(chan error, len(w))
+
+	// for each provider start go routine that invokes temperature method and forwards the response
+	for _, provider := range w {
+		go func(p weatherProvider) {
+			k, err := p.temperature(city)
+			if err != nil {
+				errs <- err
+				return
+			}
+			temps <- k
+		}(provider)
+	}
+
 	sum := 0.0
 
-	for _, provider := range providers {
-		k, err := provider.temperature(city)
-		if err != nil {
+	// collect temperature from each provider
+	for i := 0; i < len(w); i++ {
+		select {
+		case temp := <- temps:
+			sum += temp
+		case err := <- errs:
 			return 0, err
 		}
-		sum += k
 	}
-	return sum / float64(len(providers)), nil
-}
-
-type weatherData struct {
-	Name string `json:"name"`
-	Main struct {
-		Kelvin float64 `json:"temp"`
-	} `json:"main"`
-}
-
-func query(city string) (weatherData, error) {
-	resp, err := http.Get("http://api.openweathermap.org/data/2.5/weather?ADDID=YOUR_API_KEY&q=" + city)
-	if err != nil {
-		return weatherData{}, err
-	}
-
-	defer resp.Body.Close()
 	
-	var d weatherData
-
-	if err := json.NewDecoder((resp.Body).Decode(&d); err != nil {
-		return weatherData{}, err
-	})
-
-	return d, nil
+	// return the average temperature
+	return sum / float64(len(providers)), nil
 }
 
