@@ -68,9 +68,46 @@ func (w openWeatherMap) temperature (city string) (float64, error) {
 	return d.Main.Kelvin, nil
 }
 
+type weatherUnderground struct {
+	apiKey string
+}
 
-func hello(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("hello!"))
+func (w weatherUnderground) temperature (city string) (float64, error) {
+	resp, err := http.Get("http://api.weatherunderground.com/api/" + w.apiKey + "/conditions/q/" + city + ".json")
+	if err != nil {
+		return 0, nil
+	}
+
+	defer resp.Body.Close()
+
+	var d struct {
+		Observation struct {
+			Celsius float64 `json:"temp_c"`
+		} `json:"current_observation"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&d); err != nil {
+		return 0, err
+	}
+
+	kelvin := d.Observation.Celsius + 273.15
+	log.Printf("weatherUnderground: %s: %.2f", city, kelvin)
+	return kelvin, nil
+}
+
+type multiWeatherProvider []weatherProvider
+
+func (w  multiWeatherProvider) temperature (city string) {
+	sum := 0.0
+
+	for _, provider := range providers {
+		k, err := provider.temperature(city)
+		if err != nil {
+			return 0, err
+		}
+		sum += k
+	}
+	return sum / float64(len(providers)), nil
 }
 
 type weatherData struct {
